@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>ANALYCA Machine Learning Suite v0.1 | Notebook</title>
+  <!-- Tell the browser to be responsive to screen width -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Select2 -->
+</head>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<!--
+<script src="../../js/src-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+-->
+<script src="https://ace.c9.io/build/src/ace.js" type="text/javascript" charset="utf-8"></script>
+<style>
+.dataframe {
+    font-size: 10pt;
+    border-collapse: collapse;
+    border: 1px solid silver;
+    width:100%;
+    margin-top: 10px;
+}
+
+.dataframe td, th {
+    padding: 4px;
+}
+
+.dataframe th {
+    background: #E0E0E0;
+    text-align:center;
+}
+
+.dataframe tr:nth-child(even) {
+    background: #E0E0E0;
+}
+
+.dataframe tr:hover {
+    background: silver;
+    cursor: pointer;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+th, td {
+    padding: 0;
+}
+
+pre {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    white-space: pre-line;
+}
+
+.myButton {
+	box-shadow:inset 0px 1px 0px 0px #ffffff;
+	background:linear-gradient(to bottom, #f9f9f9 5%, #e9e9e9 100%);
+	background-color:#f9f9f9;
+	border-radius:4px;
+	border:1px solid #dcdcdc;
+	display:inline-block;
+	cursor:pointer;
+	color:#666666;
+	font-family:Arial;
+	font-size:12px;
+	font-weight:bold;
+	padding:3px 5px;
+	text-decoration:none;
+	text-shadow:0px 1px 0px #ffffff;
+}
+.myButton:hover {
+	background:linear-gradient(to bottom, #e9e9e9 5%, #f9f9f9 100%);
+	background-color:#e9e9e9;
+}
+.myButton:active {
+	position:relative;
+	top:1px;
+}
+</style>
+
+<script>
+
+var _PORT = 8888
+var current_file_name = "undefined"
+editors = {}
+var current_line = 0
+var exec_num = 0
+var exec_all = false
+
+function make_json(cmd,params,script) {
+    {'cmd'}
+}
+
+function run(line) {
+    code = document.getElementsByName('cell_in_'+line)[0].value
+    current_line = line
+    var socket = new WebSocket("ws://127.0.0.1:"+_PORT+"/");
+    html = ""
+    socket.onmessage = function(event) {
+        out = event.data.toString()
+        console.log(out)
+        if (out.startsWith('python_')) {
+            exec_num += 1
+            document.getElementById('script_code_'+current_line).value = out
+            document.getElementById('label_in_'+current_line).innerText = " In[*]:"
+            document.getElementById('ctrl_in_'+current_line).value = "stop"
+            document.getElementById('cell_out_'+current_line).innerHTML = ""
+        } else {
+            if (document.getElementById('cell_out_'+current_line).innerText=="") {
+              document.getElementById('label_out_'+current_line).innerText = "Out[*]:"
+              if (exec_all) {
+                location.href="#label_out_" + current_line
+              }
+            }
+            if (out.indexOf('\r') > -1) {
+                n = document.getElementById('cell_out_'+current_line).innerHTML.lastIndexOf('\n');
+                document.getElementById('cell_out_'+current_line).innerHTML = document.getElementById('cell_out_'+current_line).innerHTML.substr(0, n)
+            }
+            document.getElementById('cell_out_'+current_line).innerHTML += out
+
+        }
+    };
+    socket.onclose = function(event) {
+        console.log(event);
+        document.getElementById('label_in_'+current_line).innerText = " In["+exec_num+"]:"
+        if (document.getElementById('cell_out_'+current_line).innerHTML.length > 0) {
+          document.getElementById('label_out_'+current_line).innerText = "Out["+exec_num+"]:"
+        }
+        document.getElementById('ctrl_in_'+current_line).value = "run"
+        if (exec_all) {
+          run(current_line+1)
+        } else {
+          if (document.querySelector("#cell_" + (current_line+1)) == null) {
+              add_cell()
+          }
+        }
+    };
+    socket.onerror = function(event) {
+        console.log(event);
+    };
+    socket.onopen = function(e) {
+        if (document.getElementById('ctrl_in_'+current_line).value == "run") {
+            var data1 = new Object();
+            data1.cmd = "run";
+            data1.script = code;
+            var jsonData = JSON.stringify(data1) ;
+            socket.send(jsonData);
+            console.log("send done.");
+        } else {
+            exec_all = false
+            var data1 = new Object();
+            data1.cmd = "stop";
+            data1.code = document.getElementById('script_code_'+line).value;
+            var jsonData = JSON.stringify(data1) ;
+            socket.send(jsonData);
+            console.log("send done.");
+        }
+    };
+}
+
+
+function open(file_name) {
+    current_file_name = file_name
+    ctrl_file('open')
+}
+
+function ctrl_file(ctrl,param) {
+    var socket = new WebSocket("ws://127.0.0.1:"+_PORT+"/");
+    socket.onmessage = function(event) {
+        out = event.data.toString()
+        if (ctrl == "save") {
+          alert(out)
+        } else if (ctrl == "list") {
+          document.getElementById("list").innerHTML = out
+          document.getElementById("file_select").style.display = "block";
+        }  else if (ctrl == "open") {
+          document.body.innerHTML = out
+          ready()
+          document.getElementById("file_select").style.display = "none";
+        } else {
+            document.getElementById('cell_out_'+current_line).innerHTML += out
+        }
+    };
+    socket.onclose = function(event) {
+        console.log(event);
+    };
+    socket.onerror = function(event) {
+        console.log(event);
+    };
+    socket.onopen = function(e) {
+      if (ctrl == "save") {
+        file_name = prompt("Please enter *.alnb file name",current_file_name)
+        if (file_name) {
+            current_file_name = file_name
+            ready()
+            html = document.body.innerHTML
+            var data1 = new Object();
+            data1.cmd = "save"
+            data1.file_name = file_name
+            data1.html = html
+            var jsonData = JSON.stringify(data1) ;
+            socket.send(jsonData)
+            console.log("send done.");
+        }
+      } else if (ctrl == "open") {
+        var data1 = new Object();
+        data1.cmd = "open"
+        data1.file_name = current_file_name
+        var jsonData = JSON.stringify(data1) ;
+        socket.send(jsonData)
+        console.log("send done.");
+      } else if (ctrl == "list") {
+        var data1 = new Object();
+        data1.cmd = "list"
+        var jsonData = JSON.stringify(data1) ;
+        socket.send(jsonData);
+        console.log("send done.");
+      } else {
+        var data1 = new Object();
+        data1.cmd = ctrl
+        data1.param = param
+        var jsonData = JSON.stringify(data1) ;
+        socket.send(jsonData);
+        console.log("send done.");
+      }
+    };
+}
+
+function execute_all() {
+  exec_all = true
+  run(1)
+}
+
+function add_cell() {
+    for (i=1;i<100;i++) {
+       if (document.querySelector("#cell_" + i) == null) {
+          var cellLoading = '\
+<div id="cell_1">\
+    <hr>\
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="table-layout: fixed;">\
+        <tr>\
+          <td width="5%" valign="top">\
+              <label id="label_in_1"> In[]:</label>\
+              <input class="myButton" type="button" id="ctrl_in_1" onclick="run(1)" value="run">\
+              <input type="hidden" id="script_code_1" value="">\
+          </td>\
+            <td width="95%" valign="center">\
+                <pre id="cell_in_1" data-name="cell_in_1" class="editor"></pre>\
+                <input name="cell_in_1" type="hidden" value="#Code here...\n\n\n"/>\
+            </td>\
+        </tr>\
+        <tr>\
+            <td width="5%" valign="top">\
+                <font color="red"><label id="label_out_1"></label></font>\
+            </td>\
+            <td width="95%" valign="top">\
+                <div style="background-color:white;padding:0px 10px 0px 10px;">\
+                    <pre id="cell_out_1" style="width:100%;overflow:auto;"></pre>\
+                </div>\
+            </td>\
+        </tr>\
+    </table>\
+</div>\
+          ';
+          var find = "_1";
+          var re = new RegExp(find, 'g');
+          cellLoading = cellLoading.replace(re,"_" + i)
+          document.body.innerHTML += cellLoading.replace("run(1)","run("+i+")")
+          ready()
+          document.getElementById("cell_in_" + i).focus();
+          location.href="#cell_in_" + i
+          return
+       }
+    }
+}
+
+function ready(){
+    $(document).ready(function(){
+        var editor;
+        var ednum = 0;
+        ace_config = {
+            maxLines: Infinity,
+            enableBasicAutocompletion: true,
+            enableSnippets: true,
+            enableLiveAutocompletion: false
+
+        };
+        $('.editor').each(function( index ) {
+            ednum++;
+            _name = "editor_"+ ednum;
+            code = "var name = $(this).data('name');"
+            +_name+" = ace.edit(this);"
+            +_name+".setTheme('ace/theme/chrome');"
+            +_name+".getSession().setMode('ace/mode/python');"
+            +_name+".setOptions(ace_config);"
+            +"var code_"+ednum+" = $('textarea[name='+name+']');"
+            +_name+".getSession().setValue($('input[name='+name+']').val());"
+            +_name+".getSession().on('change', function(){"
+            +"$('input[name='+name+']').val("+_name+".getSession().getValue());"
+            +"});";
+            eval(code);
+        });
+    });
+
+    document.getElementById("file_name").innerText = current_file_name
+}
+</script>
+<body style="background: #f4f6f9;margin:0px 100px 200px 100px;" onload="ready()">
+<h4>ANALYCA Notebook v0.1  (<font color="blue"><span id="file_name"></span></font> )</h4>
+<div class="row">
+<button class="myButton" type="button" onclick="add_cell()">Add New Cell</button>
+<button class="myButton" type="button" onclick="ctrl_file('save')">Save</button>
+<button class="myButton" type="button" onclick="ctrl_file('list')">Open</button>
+<button class="myButton" type="button" onclick="execute_all()">Execute all</button>
+</div>
+
+<div id="file_select" style="display:none;">
+    <hr>
+    <span>Select file!</span><br>
+    <span id="list"></span>
+</div>
+<div id="cell_1">
+    <hr>
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="table-layout: fixed;">
+        <tr>
+          <td width="5%" valign="top">
+              <label id="label_in_1"> In[]:</label>
+              <input class="myButton" type="button" id="ctrl_in_1" onclick="run(1)" value="run">
+              <input type="hidden" id="script_code_1" value="">
+          </td>
+            <td width="95%" valign="center">
+                <pre id="cell_in_1" data-name="cell_in_1" class="editor"></pre>
+                <input name="cell_in_1" type="hidden" value="#Code here...
+
+
+"/>
+            </td>
+        </tr>
+        <tr>
+            <td width="5%" valign="top">
+                <font color="red"><label id="label_out_1"></label></font>
+            </td>
+            <td width="95%" valign="top">
+                <div style="background-color:white;padding:0px 10px 0px 10px;">
+                    <pre id="cell_out_1" style="width:100%;overflow:auto;"></pre>
+                </div>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!--
+<script>
+    var editor = ace.edit("cell_in_1");
+    editor.setTheme("ace/theme/chrome");
+    editor.session.setMode("ace/mode/python");
+</script>
+-->
+</body>
+</html>
