@@ -1,0 +1,95 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyPUC2tGLBWY50UQPir9XOUV",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/dolmani38/notebook/blob/main/influencer_search_1226.pynb\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# 인스타 인풀루언서 검색 모듈"
+      ],
+      "metadata": {
+        "id": "PGtiQk3nND8W"
+      }
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "9RF0qv4-MyLL"
+      },
+      "outputs": [],
+      "source": [
+        "\n",
+        "import requests\n",
+        "from urllib.parse import urlencode\n",
+        "\n",
+        "# Access token을 여기에 입력하세요.\n",
+        "ACCESS_TOKEN = 'your_access_token'\n",
+        "# 검색하고자 하는 태그 리스트를 입력하세요.\n",
+        "TAGS = ['tag1', 'tag2', 'tag3']\n",
+        "\n",
+        "def get_instagram_data(access_token, tag):\n",
+        "    base_url = 'https://graph.instagram.com'\n",
+        "    search_url = f'{base_url}/ig_hashtag_search?user_id={user_id}&q={tag}&access_token={access_token}'\n",
+        "\n",
+        "    try:\n",
+        "        response = requests.get(search_url)\n",
+        "        response.raise_for_status()\n",
+        "        hashtag_info = response.json()['data'][0]\n",
+        "\n",
+        "        recent_media_url = f'{base_url}/{hashtag_info[\"id\"]}/recent_media?user_id={user_id}&fields=id,owner,caption&access_token={access_token}'\n",
+        "        response = requests.get(recent_media_url)\n",
+        "        response.raise_for_status()\n",
+        "        media_list = response.json()['data']\n",
+        "\n",
+        "        for media in media_list:\n",
+        "            owner_id = media['owner']['id']\n",
+        "            account_details = get_account_details(owner_id, access_token)\n",
+        "            print(f\"Account: {account_details['username']}, Followers: {account_details['followers_count']}\")\n",
+        "    except requests.exceptions.HTTPError as http_err:\n",
+        "        print(f\"HTTP error occurred: {http_err}\")\n",
+        "    except Exception as err:\n",
+        "        print(f\"An error occurred: {err}\")\n",
+        "\n",
+        "def get_account_details(owner_id, access_token):\n",
+        "    fields = 'username,media_count,followers_count,follows_count'\n",
+        "    account_url = f'https://graph.instagram.com/{owner_id}?fields={fields}&access_token={access_token}'\n",
+        "\n",
+        "    response = requests.get(account_url)\n",
+        "    if response.status_code == 200:\n",
+        "        return response.json()\n",
+        "    else:\n",
+        "        # 여기서 에러 처리를 할 수 있습니다.\n",
+        "        response.raise_for_status()\n",
+        "\n",
+        "if __name__ == '__main__':\n",
+        "    for tag in TAGS:\n",
+        "        get_instagram_data(ACCESS_TOKEN, tag)"
+      ]
+    }
+  ]
+}
